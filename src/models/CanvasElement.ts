@@ -1,3 +1,5 @@
+import type { ControlFunction } from '../controls/controlFunctions'
+
 export interface Position {
   x: number
   y: number
@@ -42,7 +44,7 @@ export abstract class CanvasElement {
     x: number = 0,
     y: number = 0,
     width: number = 100,
-    height: number = 100
+    height: number = 100,
   ) {
     this.id = id
     this.type = type
@@ -53,7 +55,7 @@ export abstract class CanvasElement {
       height,
       rotation: 0,
       scaleX: 1,
-      scaleY: 1
+      scaleY: 1,
     }
     this.zIndex = 0
     this.visible = true
@@ -64,6 +66,14 @@ export abstract class CanvasElement {
   // Abstract methods that child classes must implement
   abstract getContextMenuOptions(): ContextMenuOption[]
   abstract clone(): CanvasElement
+
+  // Control methods - every element must define its controls
+  public abstract getControlList(): string[]
+
+  // Optional: Elements can override control behavior
+  public getControlOverrides(): Record<string, Partial<ControlFunction>> {
+    return {}
+  }
 
   // Common methods for all elements
   public setPosition(x: number, y: number): void {
@@ -106,7 +116,7 @@ export abstract class CanvasElement {
       x: this.transform.x,
       y: this.transform.y,
       width: this.transform.width * this.transform.scaleX,
-      height: this.transform.height * this.transform.scaleY
+      height: this.transform.height * this.transform.scaleY,
     }
   }
 
@@ -128,7 +138,7 @@ export abstract class CanvasElement {
       zIndex: this.zIndex,
       visible: this.visible,
       locked: this.locked,
-      opacity: this.opacity
+      opacity: this.opacity,
     }
   }
 }

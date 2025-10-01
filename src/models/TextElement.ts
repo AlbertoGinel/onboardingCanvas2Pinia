@@ -1,11 +1,23 @@
 import { CanvasElement } from './CanvasElement'
 import type { ContextMenuOption, ElementType } from './CanvasElement'
+import type { ControlFunction } from '../controls/controlFunctions'
 
 export interface TextStyle {
   fontSize: number
   fontFamily: string
   fontStyle: 'normal' | 'italic'
-  fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
+  fontWeight:
+    | 'normal'
+    | 'bold'
+    | '100'
+    | '200'
+    | '300'
+    | '400'
+    | '500'
+    | '600'
+    | '700'
+    | '800'
+    | '900'
   fill: string
   stroke?: string
   strokeWidth?: number
@@ -27,7 +39,7 @@ export class TextElement extends CanvasElement {
     x: number = 0,
     y: number = 0,
     width: number = 200,
-    height: number = 50
+    height: number = 50,
   ) {
     super(id, 'text' as ElementType, x, y, width, height)
     this.text = text
@@ -42,7 +54,7 @@ export class TextElement extends CanvasElement {
       verticalAlign: 'top',
       textDecoration: 'none',
       lineHeight: 1.2,
-      letterSpacing: 0
+      letterSpacing: 0,
     }
   }
 
@@ -114,7 +126,7 @@ export class TextElement extends CanvasElement {
       { label: '', action: '', divider: true },
       { label: 'Lock Element', action: 'lock', icon: '🔒' },
       { label: 'Copy Style', action: 'copy-style', icon: '🎨' },
-      { label: 'Paste Style', action: 'paste-style', icon: '🖌️' }
+      { label: 'Paste Style', action: 'paste-style', icon: '🖌️' },
     ]
   }
 
@@ -125,7 +137,7 @@ export class TextElement extends CanvasElement {
       this.transform.x + 20,
       this.transform.y + 20,
       this.transform.width,
-      this.transform.height
+      this.transform.height,
     )
     cloned.style = { ...this.style }
     cloned.transform = { ...this.transform, x: this.transform.x + 20, y: this.transform.y + 20 }
@@ -140,7 +152,43 @@ export class TextElement extends CanvasElement {
       ...super.toJSON(),
       text: this.text,
       style: { ...this.style },
-      isEditing: this.isEditing
+      isEditing: this.isEditing,
+    }
+  }
+
+  // Control system methods
+  public getControlList(): string[] {
+    return [
+      // Transform controls
+      'positionX',
+      'positionY',
+      'width',
+      'height',
+      'rotation',
+      'opacity',
+
+      // Text-specific controls
+      'textContent',
+      'fontSize',
+      'fontFamily',
+      'textColor',
+    ]
+  }
+
+  public getControlOverrides(): Record<string, Partial<ControlFunction>> {
+    return {
+      // Example: Custom text content config
+      textContent: {
+        getConfig: () => ({
+          placeholder: 'Enter your text...',
+          maxLength: 200,
+        }),
+      },
+
+      // Example: Custom font size range
+      fontSize: {
+        getConfig: () => ({ min: 8, max: 64, step: 1 }),
+      },
     }
   }
 }

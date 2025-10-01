@@ -1,5 +1,7 @@
 import { CanvasElement } from './CanvasElement'
 import type { ContextMenuOption, ElementType } from './CanvasElement'
+import type { ControlFunction } from '../controls/controlFunctions'
+import type { AnyCanvasElement } from './index'
 
 export interface ImageFilter {
   brightness?: number
@@ -31,7 +33,7 @@ export class ImageElement extends CanvasElement {
     x: number = 0,
     y: number = 0,
     width: number = 200,
-    height: number = 200
+    height: number = 200,
   ) {
     super(id, 'image' as ElementType, x, y, width, height)
     this.src = src
@@ -56,7 +58,7 @@ export class ImageElement extends CanvasElement {
     this.loaded = true
     this.naturalWidth = naturalWidth
     this.naturalHeight = naturalHeight
-    
+
     // Auto-adjust element size to maintain aspect ratio if not manually set
     if (this.transform.width === 200 && this.transform.height === 200) {
       const aspectRatio = naturalWidth / naturalHeight
@@ -140,7 +142,7 @@ export class ImageElement extends CanvasElement {
       { label: 'Send to Back', action: 'send-to-back', icon: '⬇️' },
       { label: '', action: '', divider: true },
       { label: 'Lock Element', action: 'lock', icon: '🔒' },
-      { label: 'Download Image', action: 'download-image', icon: '💾' }
+      { label: 'Download Image', action: 'download-image', icon: '💾' },
     ]
   }
 
@@ -152,7 +154,7 @@ export class ImageElement extends CanvasElement {
       this.transform.x + 20,
       this.transform.y + 20,
       this.transform.width,
-      this.transform.height
+      this.transform.height,
     )
     cloned.loaded = this.loaded
     cloned.naturalWidth = this.naturalWidth
@@ -175,7 +177,46 @@ export class ImageElement extends CanvasElement {
       naturalWidth: this.naturalWidth,
       naturalHeight: this.naturalHeight,
       filters: { ...this.filters },
-      crop: this.crop ? { ...this.crop } : null
+      crop: this.crop ? { ...this.crop } : null,
+    }
+  }
+
+  // Control system methods
+  public getControlList(): string[] {
+    return [
+      // Transform controls
+      'positionX',
+      'positionY',
+      'width',
+      'height',
+      'rotation',
+      'opacity',
+
+      // Image-specific controls
+      'imageSrc',
+      'imageAlt',
+    ]
+  }
+
+  public getControlOverrides(): Record<string, Partial<ControlFunction>> {
+    return {
+      // Maintain aspect ratio when resizing
+      width: {
+        setValue: (element: AnyCanvasElement, value: string | number | boolean) => {
+          const aspectRatio = this.getAspectRatio()
+          const numValue = typeof value === 'number' ? value : parseFloat(String(value)) || 1
+          element.transform.width = Math.max(1, numValue)
+          element.transform.height = Math.max(1, numValue / aspectRatio)
+        },
+      },
+      height: {
+        setValue: (element: AnyCanvasElement, value: string | number | boolean) => {
+          const aspectRatio = this.getAspectRatio()
+          const numValue = typeof value === 'number' ? value : parseFloat(String(value)) || 1
+          element.transform.height = Math.max(1, numValue)
+          element.transform.width = Math.max(1, numValue * aspectRatio)
+        },
+      },
     }
   }
 }

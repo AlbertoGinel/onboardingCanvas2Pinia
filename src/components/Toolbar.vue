@@ -1,6 +1,8 @@
 <template>
   <div class="toolbar">
+    <!-- Tools Section -->
     <div class="toolbar-section">
+      <h4 class="section-title">Tools</h4>
       <button
         v-for="tool in tools"
         :key="tool.id"
@@ -9,158 +11,34 @@
         :title="tool.title"
       >
         <span class="icon">{{ tool.icon }}</span>
-        <span class="label">{{ tool.label }}</span>
       </button>
-    </div>
-    
-    <div class="toolbar-section">
-      <button
-        v-for="action in actions"
-        :key="action.id"
-        class="toolbar-button"
-        @click="handleActionClick(action.id)"
-        :title="action.title"
-        :disabled="action.disabled"
-      >
-        <span class="icon">{{ action.icon }}</span>
-        <span class="label">{{ action.label }}</span>
-      </button>
-    </div>
-    
-    <div class="toolbar-section">
-      <div class="zoom-controls">
-        <button class="toolbar-button small" @click="zoomOut" title="Zoom Out">
-          <span class="icon">🔍➖</span>
-        </button>
-        <span class="zoom-level">{{ Math.round(canvasStore.settings.zoom * 100) }}%</span>
-        <button class="toolbar-button small" @click="zoomIn" title="Zoom In">
-          <span class="icon">🔍➕</span>
-        </button>
-        <button class="toolbar-button small" @click="resetZoom" title="Reset Zoom">
-          <span class="icon">🎯</span>
-        </button>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useCanvasStore } from '../stores'
 
 const canvasStore = useCanvasStore()
 
-const activeTool = ref('select')
+const activeTool = ref('text')
 
 const tools = [
-  { id: 'select', icon: '🏹', label: 'Select', title: 'Select Tool (V)' },
-  { id: 'text', icon: '📝', label: 'Text', title: 'Add Text (T)' },
-  { id: 'image', icon: '🖼️', label: 'Image', title: 'Add Image (I)' },
-  { id: 'button', icon: '🔘', label: 'Button', title: 'Add Button (B)' }
+  { id: 'text', icon: '📝', label: 'Text', title: 'Text Templates & Styles' },
+  { id: 'images', icon: '🖼️', label: 'Images', title: 'Image Library & Upload' },
+  { id: 'buttons', icon: '🔘', label: 'Buttons', title: 'Button Templates' },
+  { id: 'shapes', icon: '🔷', label: 'Shapes', title: 'Basic Shapes & Graphics' },
 ]
 
-const actions = computed(() => [
-  { 
-    id: 'undo', 
-    icon: '↶', 
-    label: 'Undo', 
-    title: 'Undo (Ctrl+Z)', 
-    disabled: !canvasStore.canUndo 
-  },
-  { 
-    id: 'redo', 
-    icon: '↷', 
-    label: 'Redo', 
-    title: 'Redo (Ctrl+Y)', 
-    disabled: !canvasStore.canRedo 
-  },
-  { 
-    id: 'delete', 
-    icon: '🗑️', 
-    label: 'Delete', 
-    title: 'Delete Selected (Del)', 
-    disabled: !canvasStore.hasSelection 
-  },
-  { 
-    id: 'duplicate', 
-    icon: '📋', 
-    label: 'Duplicate', 
-    title: 'Duplicate Selected (Ctrl+D)', 
-    disabled: !canvasStore.hasSelection 
-  },
-  { 
-    id: 'clear', 
-    icon: '🧹', 
-    label: 'Clear All', 
-    title: 'Clear All Elements', 
-    disabled: canvasStore.elements.length === 0 
-  }
-])
+// Make activeTool globally accessible by emitting it
+const emit = defineEmits<{
+  toolChanged: [toolId: string]
+}>()
 
 function handleToolClick(toolId: string) {
   activeTool.value = toolId
-  
-  switch (toolId) {
-    case 'select':
-      // Default select tool - no action needed
-      break
-    case 'text':
-      canvasStore.createTextElement()
-      activeTool.value = 'select' // Return to select tool after creation
-      break
-    case 'image':
-      // For now, add a placeholder image
-      canvasStore.createImageElement('https://picsum.photos/200/200')
-      activeTool.value = 'select'
-      break
-    case 'button':
-      canvasStore.createButtonElement()
-      activeTool.value = 'select'
-      break
-  }
-}
-
-function handleActionClick(actionId: string) {
-  switch (actionId) {
-    case 'undo':
-      canvasStore.undo()
-      break
-    case 'redo':
-      canvasStore.redo()
-      break
-    case 'delete':
-      // Delete all selected elements
-      const selectedIds = Array.from(canvasStore.selectedElementIds)
-      canvasStore.removeElements(selectedIds)
-      break
-    case 'duplicate':
-      // Duplicate all selected elements
-      const elementsToDuplicate = Array.from(canvasStore.selectedElementIds)
-      elementsToDuplicate.forEach(id => {
-        canvasStore.duplicateElement(id)
-      })
-      break
-    case 'clear':
-      if (confirm('Are you sure you want to clear all elements?')) {
-        canvasStore.elements.length = 0
-        canvasStore.clearSelection()
-      }
-      break
-  }
-}
-
-function zoomIn() {
-  canvasStore.settings.zoom = Math.min(5, canvasStore.settings.zoom * 1.2)
-}
-
-function zoomOut() {
-  canvasStore.settings.zoom = Math.max(0.1, canvasStore.settings.zoom / 1.2)
-}
-
-function resetZoom() {
-  canvasStore.settings.zoom = 1
-  canvasStore.settings.panX = 0
-  canvasStore.settings.panY = 0
+  emit('toolChanged', toolId)
 }
 
 // Keyboard shortcuts
@@ -169,17 +47,18 @@ function handleKeydown(e: KeyboardEvent) {
   if (canvasStore.isTextEditing) {
     return
   }
-  
+
   // Don't process shortcuts if focus is on an input element
   const activeElement = document.activeElement
-  if (activeElement && (
-    activeElement.tagName === 'INPUT' ||
-    activeElement.tagName === 'TEXTAREA' ||
-    (activeElement as HTMLElement).contentEditable === 'true'
-  )) {
+  if (
+    activeElement &&
+    (activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      (activeElement as HTMLElement).contentEditable === 'true')
+  ) {
     return
   }
-  
+
   if (e.ctrlKey || e.metaKey) {
     switch (e.key.toLowerCase()) {
       case 'z':
@@ -197,7 +76,7 @@ function handleKeydown(e: KeyboardEvent) {
       case 'd':
         e.preventDefault()
         const selectedIds = Array.from(canvasStore.selectedElementIds)
-        selectedIds.forEach(id => {
+        selectedIds.forEach((id) => {
           canvasStore.duplicateElement(id)
         })
         break
@@ -214,11 +93,6 @@ function handleKeydown(e: KeyboardEvent) {
         const selectedIds = Array.from(canvasStore.selectedElementIds)
         canvasStore.removeElements(selectedIds)
         break
-      case 'v':
-        if (!e.ctrlKey && !e.metaKey) {
-          activeTool.value = 'select'
-        }
-        break
       case 't':
         if (!e.ctrlKey && !e.metaKey) {
           handleToolClick('text')
@@ -226,16 +100,20 @@ function handleKeydown(e: KeyboardEvent) {
         break
       case 'i':
         if (!e.ctrlKey && !e.metaKey) {
-          handleToolClick('image')
+          handleToolClick('images')
         }
         break
       case 'b':
         if (!e.ctrlKey && !e.metaKey) {
-          handleToolClick('button')
+          handleToolClick('buttons')
+        }
+        break
+      case 's':
+        if (!e.ctrlKey && !e.metaKey) {
+          handleToolClick('shapes')
         }
         break
       case 'Escape':
-        activeTool.value = 'select'
         canvasStore.clearSelection()
         break
     }
@@ -256,88 +134,114 @@ onUnmounted(() => {
 
 <style scoped>
 .toolbar {
+  width: 60px;
+  background: #2c3e50;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  padding: 0.5rem;
-  background: white;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 16px 8px;
+  gap: 24px;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .toolbar-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0 0.5rem;
-  border-left: 1px solid #e9ecef;
+  gap: 8px;
+  width: 100%;
 }
 
-.toolbar-section:first-child {
-  border-left: none;
-  padding-left: 0;
+.section-title {
+  font-size: 10px;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+  text-align: center;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
 }
 
 .toolbar-button {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.125rem;
-  padding: 0.5rem 0.75rem;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  color: #bdc3c7;
   transition: all 0.2s;
-  font-size: 12px;
-  min-width: 60px;
+  position: relative;
 }
 
 .toolbar-button:hover {
-  background: #f8f9fa;
+  background: #34495e;
+  color: #ecf0f1;
 }
 
 .toolbar-button.active {
-  background: #007bff;
+  background: #3498db;
   color: white;
 }
 
 .toolbar-button:disabled {
-  opacity: 0.5;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .toolbar-button:disabled:hover {
   background: transparent;
+  color: #bdc3c7;
 }
 
 .toolbar-button.small {
-  min-width: auto;
-  padding: 0.25rem 0.5rem;
-  flex-direction: row;
-  gap: 0.25rem;
+  width: 36px;
+  height: 36px;
 }
 
-.toolbar-button .icon {
-  font-size: 16px;
-}
-
-.toolbar-button .label {
-  font-size: 11px;
-  font-weight: 500;
+.icon {
+  font-size: 20px;
 }
 
 .zoom-controls {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 4px;
+  width: 100%;
 }
 
 .zoom-level {
-  font-size: 12px;
-  font-weight: 500;
-  color: #666;
-  min-width: 40px;
+  font-size: 10px;
+  color: #bdc3c7;
   text-align: center;
+  margin: 4px 0;
+}
+
+/* Tooltip on hover */
+.toolbar-button::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  margin-left: 8px;
+  padding: 4px 8px;
+  background: #2c3e50;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1000;
+}
+
+.toolbar-button:hover::after {
+  opacity: 1;
 }
 </style>

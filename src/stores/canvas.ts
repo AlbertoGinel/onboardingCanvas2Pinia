@@ -2,6 +2,7 @@ import { ref, computed, reactive } from 'vue'
 import { defineStore } from 'pinia'
 import { TextElement, ImageElement, ButtonElement } from '../models'
 import type { AnyCanvasElement, ContextMenuOption } from '../models'
+import { imageService } from '../services/imageService'
 
 export interface ContextMenu {
   visible: boolean
@@ -31,7 +32,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const clipboard = ref<AnyCanvasElement[]>([])
   const history = ref<{ elements: AnyCanvasElement[]; selectedIds: string[] }[]>([])
   const historyIndex = ref(-1)
-  
+
   // Canvas settings
   const settings = reactive<CanvasSettings>({
     width: 800,
@@ -43,7 +44,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     showRulers: false,
     zoom: 1,
     panX: 0,
-    panY: 0
+    panY: 0,
   })
 
   // Context menu state
@@ -52,7 +53,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     x: 0,
     y: 0,
     elementId: null,
-    options: []
+    options: [],
   })
 
   // UI state
@@ -62,8 +63,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const dragStartPos = ref({ x: 0, y: 0 })
 
   // Computed properties
-  const selectedElements = computed(() => 
-    elements.value.filter(element => selectedElementIds.value.has(element.id))
+  const selectedElements = computed(() =>
+    elements.value.filter((element) => selectedElementIds.value.has(element.id)),
   )
 
   const hasSelection = computed(() => selectedElementIds.value.size > 0)
@@ -72,22 +73,20 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const canRedo = computed(() => historyIndex.value < history.value.length - 1)
 
-  const sortedElements = computed(() => 
-    [...elements.value].sort((a, b) => a.zIndex - b.zIndex)
-  )
+  const sortedElements = computed(() => [...elements.value].sort((a, b) => a.zIndex - b.zIndex))
 
   // Element management actions
   function addElement(element: AnyCanvasElement): void {
     // Assign a unique zIndex
     const maxZIndex = elements.value.reduce((max, el) => Math.max(max, el.zIndex), 0)
     element.zIndex = maxZIndex + 1
-    
+
     elements.value.push(element)
     saveToHistory()
   }
 
   function removeElement(elementId: string): void {
-    const index = elements.value.findIndex(el => el.id === elementId)
+    const index = elements.value.findIndex((el) => el.id === elementId)
     if (index !== -1) {
       elements.value.splice(index, 1)
       selectedElementIds.value.delete(elementId)
@@ -96,8 +95,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   function removeElements(elementIds: string[]): void {
-    elementIds.forEach(id => {
-      const index = elements.value.findIndex(el => el.id === id)
+    elementIds.forEach((id) => {
+      const index = elements.value.findIndex((el) => el.id === id)
       if (index !== -1) {
         elements.value.splice(index, 1)
         selectedElementIds.value.delete(id)
@@ -107,7 +106,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   function duplicateElement(elementId: string): AnyCanvasElement | null {
-    const element = elements.value.find(el => el.id === elementId)
+    const element = elements.value.find((el) => el.id === elementId)
     if (!element) return null
 
     const cloned = element.clone()
@@ -117,14 +116,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   function updateElement(elementId: string, updates: Partial<AnyCanvasElement>): void {
-    const element = elements.value.find(el => el.id === elementId)
+    const element = elements.value.find((el) => el.id === elementId)
     if (element) {
       Object.assign(element, updates)
     }
   }
 
   function getElementById(elementId: string): AnyCanvasElement | null {
-    return elements.value.find(el => el.id === elementId) || null
+    return elements.value.find((el) => el.id === elementId) || null
   }
 
   // Selection actions
@@ -141,7 +140,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   function selectElements(elementIds: string[]): void {
     selectedElementIds.value.clear()
-    elementIds.forEach(id => selectedElementIds.value.add(id))
+    elementIds.forEach((id) => selectedElementIds.value.add(id))
   }
 
   function clearSelection(): void {
@@ -150,7 +149,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   function selectAll(): void {
-    elements.value.forEach(element => selectedElementIds.value.add(element.id))
+    elements.value.forEach((element) => selectedElementIds.value.add(element.id))
   }
 
   // Z-index management
@@ -197,8 +196,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Create a deep copy of current state
     const snapshot = {
-      elements: elements.value.map(el => el.clone()),
-      selectedIds: Array.from(selectedElementIds.value)
+      elements: elements.value.map((el) => el.clone()),
+      selectedIds: Array.from(selectedElementIds.value),
     }
 
     history.value.push(snapshot)
@@ -270,10 +269,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         { label: 'Add Button', action: 'add-button', icon: '🔘' },
         { label: '', action: '', divider: true },
         { label: 'Paste', action: 'paste', icon: '📋' },
-        { label: 'Select All', action: 'select-all', icon: '🔲' }
+        { label: 'Select All', action: 'select-all', icon: '🔲' },
       ]
     }
-    
+
     contextMenu.x = x
     contextMenu.y = y
     contextMenu.visible = true
@@ -294,15 +293,77 @@ export const useCanvasStore = defineStore('canvas', () => {
     return id
   }
 
-  function createImageElement(src: string, alt: string = '', x: number = 100, y: number = 100): string {
+  function createImageElement(imageAssetIdOrSrc?: string, x?: number, y?: number): string {
     const id = `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const element = new ImageElement(id, src, alt, x, y)
+
+    let imageData: {
+      src: string
+      alt: string
+      x: number
+      y: number
+      width: number
+      height: number
+    }
+
+    // Check if it's an imageAssetId from the image service
+    if (
+      imageAssetIdOrSrc &&
+      (imageAssetIdOrSrc.startsWith('stock-') ||
+        imageAssetIdOrSrc.startsWith('uploaded-') ||
+        imageAssetIdOrSrc.startsWith('url-'))
+    ) {
+      // It's an image asset ID - use the image service
+      const imageAsset = imageService.getImageAsset(imageAssetIdOrSrc)
+
+      if (imageAsset) {
+        imageData = imageService.createImageElementData(imageAsset, x, y)
+        console.log('Creating image element from asset:', imageAsset.title, imageData)
+      } else {
+        // Fallback if asset not found
+        console.warn(`Image asset not found: ${imageAssetIdOrSrc}, using fallback`)
+        imageData = {
+          src: 'https://picsum.photos/200/300',
+          alt: 'Fallback Image',
+          x: x ?? 100,
+          y: y ?? 100,
+          width: 200,
+          height: 200,
+        }
+      }
+    } else {
+      // It's a direct src URL or no parameter (backward compatibility)
+      const src = imageAssetIdOrSrc || 'https://picsum.photos/200/300'
+      imageData = {
+        src,
+        alt: 'Image',
+        x: x ?? 100,
+        y: y ?? 100,
+        width: 200,
+        height: 200,
+      }
+    }
+
+    const element = new ImageElement(
+      id,
+      imageData.src,
+      imageData.alt,
+      imageData.x,
+      imageData.y,
+      imageData.width,
+      imageData.height,
+    )
+
     addElement(element)
     selectElement(id)
+    console.log('Created image element:', element)
     return id
   }
 
-  function createButtonElement(text: string = 'Click Me', x: number = 100, y: number = 100): string {
+  function createButtonElement(
+    text: string = 'Click Me',
+    x: number = 100,
+    y: number = 100,
+  ): string {
     const id = `button_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const element = new ButtonElement(id, text, x, y)
     addElement(element)
@@ -369,6 +430,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Element creation
     createTextElement,
     createImageElement,
-    createButtonElement
+    createButtonElement,
   }
 })

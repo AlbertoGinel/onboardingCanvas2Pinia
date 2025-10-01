@@ -1,5 +1,6 @@
 import { CanvasElement } from './CanvasElement'
 import type { ContextMenuOption, ElementType } from './CanvasElement'
+import type { ControlFunction } from '../controls/controlFunctions'
 
 export interface ButtonStyle {
   backgroundColor: string
@@ -9,7 +10,18 @@ export interface ButtonStyle {
   textColor: string
   fontSize: number
   fontFamily: string
-  fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
+  fontWeight:
+    | 'normal'
+    | 'bold'
+    | '100'
+    | '200'
+    | '300'
+    | '400'
+    | '500'
+    | '600'
+    | '700'
+    | '800'
+    | '900'
   padding: {
     top: number
     right: number
@@ -45,7 +57,7 @@ export class ButtonElement extends CanvasElement {
     x: number = 0,
     y: number = 0,
     width: number = 120,
-    height: number = 40
+    height: number = 40,
   ) {
     super(id, 'button' as ElementType, x, y, width, height)
     this.text = text
@@ -53,7 +65,7 @@ export class ButtonElement extends CanvasElement {
     this.target = '_blank'
     this.disabled = false
     this.onClick = ''
-    
+
     this.style = {
       backgroundColor: '#007bff',
       borderColor: '#007bff',
@@ -67,22 +79,22 @@ export class ButtonElement extends CanvasElement {
         top: 8,
         right: 16,
         bottom: 8,
-        left: 16
+        left: 16,
       },
       shadow: {
         offsetX: 0,
         offsetY: 2,
         blur: 4,
-        color: 'rgba(0, 0, 0, 0.1)'
-      }
+        color: 'rgba(0, 0, 0, 0.1)',
+      },
     }
 
     this.hoverStyle = {
-      backgroundColor: '#0056b3'
+      backgroundColor: '#0056b3',
     }
 
     this.activeStyle = {
-      backgroundColor: '#004494'
+      backgroundColor: '#004494',
     }
   }
 
@@ -143,7 +155,7 @@ export class ButtonElement extends CanvasElement {
       top: Math.max(0, top),
       right: Math.max(0, right),
       bottom: Math.max(0, bottom),
-      left: Math.max(0, left)
+      left: Math.max(0, left),
     }
   }
 
@@ -177,7 +189,7 @@ export class ButtonElement extends CanvasElement {
       { label: 'Send to Back', action: 'send-to-back', icon: '⬇️' },
       { label: '', action: '', divider: true },
       { label: 'Lock Element', action: 'lock', icon: '🔒' },
-      { label: 'Test Button', action: 'test-button', icon: '🧪' }
+      { label: 'Test Button', action: 'test-button', icon: '🧪' },
     ]
   }
 
@@ -188,7 +200,7 @@ export class ButtonElement extends CanvasElement {
       this.transform.x + 20,
       this.transform.y + 20,
       this.transform.width,
-      this.transform.height
+      this.transform.height,
     )
     cloned.url = this.url
     cloned.target = this.target
@@ -214,7 +226,35 @@ export class ButtonElement extends CanvasElement {
       disabled: this.disabled,
       style: JSON.parse(JSON.stringify(this.style)),
       hoverStyle: { ...this.hoverStyle },
-      activeStyle: { ...this.activeStyle }
+      activeStyle: { ...this.activeStyle },
+    }
+  }
+
+  // Control system methods
+  public getControlList(): string[] {
+    return [
+      // Transform controls (limited for buttons)
+      'positionX',
+      'positionY',
+      'rotation',
+      'opacity',
+
+      // Button-specific controls
+      'buttonText',
+      'buttonUrl',
+      'backgroundColor',
+    ]
+  }
+
+  public getControlOverrides(): Record<string, Partial<ControlFunction>> {
+    return {
+      // Buttons should maintain minimum dimensions
+      width: {
+        getConfig: () => ({ min: 80, step: 1 }),
+      },
+      height: {
+        getConfig: () => ({ min: 32, step: 1 }),
+      },
     }
   }
 }
