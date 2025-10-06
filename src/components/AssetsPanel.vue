@@ -1,116 +1,88 @@
 <template>
   <div class="options-panel">
     <div class="panel-header">
-      <h3>{{ getPanelTitle() }}</h3>
+      <h3>{{ panelTitle }}</h3>
     </div>
 
     <div class="panel-content">
-      <!-- Text Templates Panel -->
-      <div v-if="activePanel === 'text'" class="text-panel">
-        <div class="text-templates">
-          <h4>Text Templates</h4>
-          <div class="template-grid">
-            <div
-              v-for="template in textTemplates"
-              :key="template.id"
-              class="template-item"
-              @click="addTextFromTemplate(template)"
-            >
-              <div class="template-preview" :style="template.style">
-                {{ template.preview }}
-              </div>
-              <span class="template-name">{{ template.name }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Universal Asset Grid - works with ANY asset type -->
+      <div v-if="currentService && currentAssets.length > 0" class="asset-library">
+        <h4>{{ panelTitle }} Library</h4>
 
-      <!-- Images Panel -->
-      <div v-else-if="activePanel === 'images'" class="images-panel">
-        <div class="image-library">
-          <h4>Image Library</h4>
-          <div class="image-grid">
-            <div
-              v-for="image in imagePool"
-              :key="image.id"
-              class="image-item"
-              @click="selectImageFromPool(image)"
-              :title="image.title"
-            >
-              <img :src="image.src" :alt="image.title" />
-              <div class="image-info">
-                <span class="image-title">{{ image.title }}</span>
-                <span class="image-category">{{ image.category }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="upload-section">
-          <h4>Upload Images</h4>
+        <!-- Search/Filter (if service supports it) -->
+        <div v-if="currentService.filterAssets" class="search-section">
           <input
-            ref="fileInput"
-            type="file"
-            accept="image/*"
-            multiple
-            @change="handleImageUpload"
-            style="display: none"
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search assets..."
+            class="search-input"
           />
-          <button class="upload-btn" @click="fileInput?.click()">
-            <span class="icon">⬆️</span>
-            <span>Upload Images</span>
-          </button>
+        </div>
+
+        <!-- Dynamic Asset Grid -->
+        <div
+          class="asset-grid"
+          :class="renderConfig?.cssClasses"
+          :style="{
+            gridTemplateColumns: `repeat(${renderConfig?.gridColumns || 2}, 1fr)`,
+            gap: '8px',
+            ...renderConfig?.customStyles,
+          }"
+        >
+          <component
+            v-for="asset in filteredAssets"
+            :key="asset.id"
+            :is="previewComponent"
+            :asset="asset"
+            @click="handleAssetSelect(asset)"
+            :style="{ height: renderConfig?.itemHeight || 'auto' }"
+          />
         </div>
       </div>
 
-      <!-- Buttons Panel -->
-      <div v-else-if="activePanel === 'buttons'" class="buttons-panel">
-        <div class="button-templates">
-          <h4>Button Templates</h4>
-          <div class="template-grid">
-            <div
-              v-for="template in buttonTemplates"
-              :key="template.id"
-              class="template-item"
-              @click="addButtonFromTemplate(template)"
-            >
-              <div class="button-preview" :style="template.style">
-                {{ template.text }}
-              </div>
-              <span class="template-name">{{ template.name }}</span>
-            </div>
-          </div>
-        </div>
+      <!-- Special upload section for images -->
+      <div v-if="activePanel === 'images'" class="upload-section">
+        <h4>Upload Images</h4>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          multiple
+          @change="handleImageUpload"
+          style="display: none"
+        />
+        <button class="upload-btn" @click="fileInput?.click()">
+          <span class="icon">⬆️</span>
+          <span>Upload Images</span>
+        </button>
       </div>
 
-      <!-- Shapes Panel -->
-      <div v-else-if="activePanel === 'shapes'" class="shapes-panel">
-        <div class="shape-library">
-          <h4>Basic Shapes</h4>
-          <div class="shape-grid">
-            <div
-              v-for="shape in basicShapes"
-              :key="shape.id"
-              class="shape-item"
-              @click="addShapeToCanvas(shape)"
-            >
-              <div class="shape-preview" :style="{ color: shape.color }">
-                {{ shape.icon }}
-              </div>
-              <span class="shape-name">{{ shape.name }}</span>
-            </div>
-          </div>
-        </div>
+      <!-- No service found message -->
+      <div v-else-if="!currentService" class="no-service">
+        <p>No assets available for {{ activePanel }}</p>
+      </div>
+
+      <!-- No assets in service -->
+      <div v-else class="no-assets">
+        <p>No {{ activePanel }} assets available</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useCanvasStore } from '../stores'
-import { imageService } from '../services/imageService'
-import type { ImageAsset } from '../services/imageService'
+import { assetServiceRegistry, imageService } from '../services'
+import type { AssetTemplate } from '../services/asset-service-interface'
+
+// Dynamic component imports
+const componentMap = {
+  TextAssetPreview: defineAsyncComponent(() => import('./asset-previews/TextAssetPreview.vue')),
+  ImageAssetPreview: defineAsyncComponent(() => import('./asset-previews/ImageAssetPreview.vue')),
+  ButtonAssetPreview: defineAsyncComponent(() => import('./asset-previews/ButtonAssetPreview.vue')),
+  ShapeAssetPreview: defineAsyncComponent(() => import('./asset-previews/ShapeAssetPreview.vue')),
+}
 
 // Props
 const props = defineProps<{
@@ -119,172 +91,52 @@ const props = defineProps<{
 
 const canvasStore = useCanvasStore()
 const fileInput = ref<HTMLInputElement>()
+const searchQuery = ref('')
 
-// Get image pool from service
-const imagePool = imageService.getImagePool()
+// Get current service based on active panel
+const currentService = computed(() => assetServiceRegistry.getService(props.activePanel))
 
-// Panel title based on active panel
-function getPanelTitle(): string {
-  switch (props.activePanel) {
-    case 'text':
-      return 'Text'
-    case 'images':
-      return 'Images'
-    case 'buttons':
-      return 'Buttons'
-    case 'shapes':
-      return 'Shapes'
-    default:
-      return 'Options'
+// Get current assets from the active service
+const currentAssets = computed(() => currentService.value?.assets.value || [])
+
+// Filtered assets based on search query
+const filteredAssets = computed(() => {
+  if (!searchQuery.value || !currentService.value?.filterAssets) {
+    return currentAssets.value
+  }
+  return currentService.value.filterAssets(searchQuery.value)
+})
+
+// Get render configuration from current service
+const renderConfig = computed(() => currentService.value?.getRenderConfig())
+
+// Get dynamic component for current service
+const previewComponent = computed(() => {
+  if (!renderConfig.value) return null
+  return componentMap[renderConfig.value.previewComponent as keyof typeof componentMap]
+})
+
+// Get panel title from current service
+const panelTitle = computed(() => currentService.value?.getDisplayName() || 'Options')
+
+// Universal asset selection handler - works with ANY asset type!
+async function handleAssetSelect(asset: AssetTemplate) {
+  if (!currentService.value) return
+
+  try {
+    // Use the service to create a canvas element
+    const { element } = await currentService.value.createCanvasElement(asset, { x: 100, y: 100 })
+
+    // Add to canvas store
+    canvasStore.addElement(element)
+
+    console.log(`✅ Added ${asset.name} to canvas`)
+  } catch (error) {
+    console.error('Failed to add asset to canvas:', error)
   }
 }
 
-// Text Templates
-const textTemplates = ref<TextTemplate[]>([
-  {
-    id: 1,
-    name: 'Heading',
-    preview: 'Heading',
-    style: { fontSize: '24px', fontWeight: 'bold', color: '#2c3e50' },
-    fontSize: 32,
-    fontWeight: 'bold',
-    text: 'Your Heading Here',
-  },
-  {
-    id: 2,
-    name: 'Subheading',
-    preview: 'Subheading',
-    style: { fontSize: '18px', fontWeight: '500', color: '#34495e' },
-    fontSize: 24,
-    fontWeight: '500',
-    text: 'Your Subheading',
-  },
-  {
-    id: 3,
-    name: 'Body Text',
-    preview: 'Body Text',
-    style: { fontSize: '14px', fontWeight: 'normal', color: '#555' },
-    fontSize: 16,
-    fontWeight: 'normal',
-    text: 'Your body text here',
-  },
-  {
-    id: 4,
-    name: 'Quote',
-    preview: '"Quote"',
-    style: { fontSize: '16px', fontStyle: 'italic', color: '#7f8c8d' },
-    fontSize: 18,
-    fontStyle: 'italic',
-    text: '"Your inspiring quote here"',
-  },
-])
-
-// Button Templates
-const buttonTemplates = ref<ButtonTemplate[]>([
-  {
-    id: 1,
-    name: 'Primary',
-    text: 'Click Me',
-    style: {
-      background: '#3498db',
-      color: 'white',
-      padding: '8px 16px',
-      borderRadius: '6px',
-      border: 'none',
-      fontSize: '14px',
-    },
-  },
-  {
-    id: 2,
-    name: 'Secondary',
-    text: 'Button',
-    style: {
-      background: '#95a5a6',
-      color: 'white',
-      padding: '8px 16px',
-      borderRadius: '6px',
-      border: 'none',
-      fontSize: '14px',
-    },
-  },
-  {
-    id: 3,
-    name: 'Success',
-    text: 'Success',
-    style: {
-      background: '#27ae60',
-      color: 'white',
-      padding: '8px 16px',
-      borderRadius: '6px',
-      border: 'none',
-      fontSize: '14px',
-    },
-  },
-  {
-    id: 4,
-    name: 'Outline',
-    text: 'Outline',
-    style: {
-      background: 'transparent',
-      color: '#3498db',
-      padding: '8px 16px',
-      borderRadius: '6px',
-      border: '2px solid #3498db',
-      fontSize: '14px',
-    },
-  },
-])
-
-// Basic Shapes
-const basicShapes = ref<Shape[]>([
-  { id: 1, name: 'Circle', icon: '●', color: '#e74c3c' },
-  { id: 2, name: 'Square', icon: '■', color: '#3498db' },
-  { id: 3, name: 'Triangle', icon: '▲', color: '#f39c12' },
-  { id: 4, name: 'Diamond', icon: '♦', color: '#9b59b6' },
-  { id: 5, name: 'Star', icon: '⭐', color: '#f1c40f' },
-  { id: 6, name: 'Heart', icon: '❤️', color: '#e91e63' },
-])
-
-// Types
-interface TextTemplate {
-  id: number
-  name: string
-  preview: string
-  style: Record<string, string>
-  fontSize: number
-  fontWeight?: string
-  text: string
-  fontStyle?: string
-}
-
-interface ButtonTemplate {
-  id: number
-  name: string
-  text: string
-  style: Record<string, string>
-}
-
-interface Shape {
-  id: number
-  name: string
-  icon: string
-  color: string
-}
-
-// Actions
-function addTextFromTemplate(template: TextTemplate) {
-  canvasStore.createTextElement()
-  // Apply template properties when element creation is updated
-  console.log('Adding text from template:', template.name)
-}
-
-// Image Actions using Image Service
-function selectImageFromPool(imageAsset: ImageAsset) {
-  // Create image element from the image pool - this will center it on canvas
-  console.log('Selecting image from pool:', imageAsset.title, imageAsset.id)
-  canvasStore.createImageElement(imageAsset.id)
-}
-
+// Image upload handler (special case for images)
 async function handleImageUpload(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
@@ -294,8 +146,9 @@ async function handleImageUpload(event: Event) {
         const imageAsset = await imageService.addUploadedImage(file)
         console.log('Image uploaded and added to pool:', imageAsset)
 
-        // Optionally auto-add to canvas
-        // canvasStore.createImageElement(imageAsset.id)
+        // Optionally auto-add to canvas after upload
+        // const assetTemplate = currentAssets.value.find(a => a.id === imageAsset.id)
+        // if (assetTemplate) handleAssetSelect(assetTemplate)
       }
 
       // Clear the input
@@ -304,17 +157,6 @@ async function handleImageUpload(event: Event) {
       console.error('Failed to upload image:', error)
     }
   }
-}
-
-function addButtonFromTemplate(template: ButtonTemplate) {
-  canvasStore.createButtonElement()
-  console.log('Adding button from template:', template.name)
-}
-
-function addShapeToCanvas(shape: Shape) {
-  // For now, create as text element with shape icon
-  console.log('Adding shape:', shape.name)
-  canvasStore.createTextElement()
 }
 </script>
 

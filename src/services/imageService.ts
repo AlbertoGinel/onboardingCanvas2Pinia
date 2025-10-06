@@ -1,4 +1,12 @@
 import { ref, computed } from 'vue'
+import type { Ref } from 'vue'
+import { ImageElement } from '../models'
+import type {
+  IAssetService,
+  AssetTemplate,
+  CanvasElementData,
+  AssetRenderConfig,
+} from './asset-service-interface'
 
 export interface ImageAsset {
   id: string
@@ -11,7 +19,7 @@ export interface ImageAsset {
   height?: number
 }
 
-class ImageService {
+class ImageService implements IAssetService {
   private imagePool = ref<ImageAsset[]>([])
   private loadingImages = ref<Set<string>>(new Set())
   private loadedImages = ref<Map<string, HTMLImageElement>>(new Map())
@@ -71,8 +79,35 @@ class ImageService {
     this.preloadImages(stockImages)
   }
 
-  // Get all images in the pool (reactive)
-  getImagePool() {
+  // IAssetService interface implementation
+  get assets(): Ref<AssetTemplate[]> {
+    return computed(() =>
+      this.imagePool.value.map((img) => ({
+        id: img.id,
+        name: img.title,
+        preview: img.thumbnail || img.src,
+        category: img.category,
+        tags: img.tags,
+        data: {
+          src: img.src,
+          title: img.title,
+          width: img.width,
+          height: img.height,
+        },
+        renderData: {
+          style: {
+            aspectRatio: `${img.width || 1}/${img.height || 1}`,
+            objectFit:
+              img.width && img.height ? (img.width > img.height ? 'cover' : 'contain') : 'cover',
+          },
+          cssClass: `image-${img.category}`,
+        },
+      })),
+    )
+  }
+
+  // Get all images in the pool (reactive) - legacy method for backward compatibility
+  get images() {
     return computed(() => this.imagePool.value)
   }
 
@@ -84,6 +119,24 @@ class ImageService {
   // Get specific image asset by ID
   getImageAsset(imageId: string): ImageAsset | null {
     return this.imagePool.value.find((img) => img.id === imageId) || null
+  }
+
+  // Get rendering configuration for image assets
+  getRenderConfig(): AssetRenderConfig {
+    return {
+      gridColumns: 3, // 3-column grid for larger image previews
+      itemHeight: '120px',
+      previewComponent: 'ImageAssetPreview',
+      cssClasses: ['image-assets-grid'],
+      customStyles: {
+        '--image-preview-size': '100px',
+        '--image-preview-radius': '8px',
+      },
+    }
+  }
+
+  getDisplayName(): string {
+    return 'Images'
   }
 
   // Add uploaded image to pool
@@ -187,7 +240,52 @@ class ImageService {
     }
   }
 
-  // Create ImageElement data for canvas (to be used by canvas store)
+  // IAssetService interface implementation
+  async createCanvasElement(
+    asset: AssetTemplate,
+    position = { x: 100, y: 100 },
+  ): Promise<CanvasElementData> {
+    const imageData = asset.data as {
+      src: string
+      title: string
+      width?: number
+      height?: number
+    }
+
+    // Calculate dimensions
+    let width = 200
+    let height = 200
+
+    if (imageData.width && imageData.height) {
+      const aspectRatio = imageData.width / imageData.height
+      if (aspectRatio > 1) {
+        // Landscape
+        width = 200
+        height = 200 / aspectRatio
+      } else {
+        // Portrait or square
+        width = 200 * aspectRatio
+        height = 200
+      }
+    }
+
+    const imageElement = new ImageElement(
+      `image-${Date.now()}`,
+      imageData.src,
+      imageData.title,
+      position.x,
+      position.y,
+      width,
+      height,
+    )
+
+    return {
+      element: imageElement,
+      position,
+    }
+  }
+
+  // Create ImageElement data for canvas (to be used by canvas store) - legacy method
   createImageElementData(
     imageAsset: ImageAsset,
     x?: number,
@@ -249,6 +347,27 @@ class ImageService {
         img.title.toLowerCase().includes(lowercaseQuery) ||
         img.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery)),
     )
+  }
+
+  // IAssetService interface implementation - optional methods
+  filterAssets(searchTerm: string): AssetTemplate[] {
+    const lowercaseQuery = searchTerm.toLowerCase()
+    return this.assets.value.filter(
+      (asset) =>
+        asset.name.toLowerCase().includes(lowercaseQuery) ||
+        asset.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery)) ||
+        asset.category?.toLowerCase().includes(lowercaseQuery),
+    )
+  }
+
+  getCategories(): string[] {
+    const categories = new Set(this.imagePool.value.map((img) => img.category).filter(Boolean))
+    return Array.from(categories) as string[]
+  }
+
+  async loadAssets(): Promise<void> {
+    // Preload stock images
+    await this.preloadImages(this.imagePool.value.filter((img) => img.category === 'stock'))
   }
 }
 
