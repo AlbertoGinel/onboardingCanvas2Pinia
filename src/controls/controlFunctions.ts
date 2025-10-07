@@ -28,6 +28,18 @@ export type ControlFunction = {
   getConfig?: () => ControlConfig
   isVisible?: (element: AnyCanvasElement) => boolean
   isDisabled?: (element: AnyCanvasElement) => boolean
+
+  // NEW: Enhanced modular properties
+  component?: string // Which component to use
+  category?: string // Group controls (filters, transform, etc.)
+  hasMenu?: boolean // Does it open a context menu?
+  shortcuts?: string[] // Keyboard shortcuts ['B', 'Ctrl+B']
+  presets?: Array<{
+    // Quick preset values
+    label: string
+    value: string | number | boolean
+  }>
+  validation?: (value: string | number | boolean) => boolean
 }
 
 // Reusable control functions

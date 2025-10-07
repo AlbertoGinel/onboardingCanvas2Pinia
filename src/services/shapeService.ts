@@ -7,6 +7,7 @@ import type {
   CanvasElementData,
   AssetRenderConfig,
 } from './asset-service-interface'
+import type { ControlFunction } from '../controls/controlFunctions'
 
 /**
  * Service for managing shape asset templates and creating shape elements
@@ -212,6 +213,84 @@ export class ShapeService implements IAssetService {
 
   getDisplayName(): string {
     return 'Shapes'
+  }
+
+  // Define what controls this tool uses
+  getControlList(): string[] {
+    return [
+      'positionX',
+      'positionY',
+      'width',
+      'height',
+      'rotation',
+      'backgroundColor',
+      'borderColor',
+      'borderWidth',
+      'borderRadius',
+      'opacity',
+      'skewX',
+      'skewY',
+    ]
+  }
+
+  // Define tool-specific control configurations
+  getControlConfigurations(): Record<string, Partial<ControlFunction>> {
+    return {
+      backgroundColor: {
+        type: 'color',
+        label: 'Fill Color',
+        icon: '🎨',
+        getValue: (element) => {
+          const shapeEl = element as ButtonElement // Using ButtonElement as base
+          return shapeEl.style.backgroundColor
+        },
+        setValue: (element, value) => {
+          const shapeEl = element as ButtonElement
+          shapeEl.setBackgroundColor(value as string)
+        },
+      },
+      borderColor: {
+        type: 'color',
+        label: 'Stroke Color',
+        icon: '✏️',
+        getValue: (element) => {
+          const shapeEl = element as ButtonElement
+          return shapeEl.style.borderColor
+        },
+        setValue: (element, value) => {
+          const shapeEl = element as ButtonElement
+          shapeEl.setBorderColor(value as string)
+        },
+      },
+      borderWidth: {
+        type: 'slider',
+        label: 'Stroke Width',
+        icon: '📏',
+        getConfig: () => ({ min: 0, max: 20, step: 1 }),
+        getValue: (element) => {
+          const shapeEl = element as ButtonElement
+          return shapeEl.style.borderWidth
+        },
+        setValue: (element, value) => {
+          const shapeEl = element as ButtonElement
+          shapeEl.setBorderWidth(value as number)
+        },
+      },
+      borderRadius: {
+        type: 'slider',
+        label: 'Corner Radius',
+        icon: '⭕',
+        getConfig: () => ({ min: 0, max: 50, step: 1 }),
+        getValue: (element) => {
+          const shapeEl = element as ButtonElement
+          return shapeEl.style.borderRadius
+        },
+        setValue: (element, value) => {
+          const shapeEl = element as ButtonElement
+          shapeEl.setBorderRadius(value as number)
+        },
+      },
+    }
   }
 }
 

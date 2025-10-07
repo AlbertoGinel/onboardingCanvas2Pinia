@@ -1,8 +1,9 @@
 import { ref, computed, reactive } from 'vue'
 import { defineStore } from 'pinia'
-import { TextElement, ImageElement, ButtonElement } from '../models'
+import { TextElement, ButtonElement } from '../models'
 import type { AnyCanvasElement, ContextMenuOption } from '../models'
-import { imageService } from '../services/imageService'
+import { assetServiceRegistry } from '../services'
+import { useAssetStore } from './assets'
 
 export interface ContextMenu {
   visible: boolean
@@ -85,25 +86,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     saveToHistory()
   }
 
-  function removeElement(elementId: string): void {
-    const index = elements.value.findIndex((el) => el.id === elementId)
-    if (index !== -1) {
-      elements.value.splice(index, 1)
-      selectedElementIds.value.delete(elementId)
-      saveToHistory()
-    }
-  }
-
-  function removeElements(elementIds: string[]): void {
-    elementIds.forEach((id) => {
-      const index = elements.value.findIndex((el) => el.id === id)
-      if (index !== -1) {
-        elements.value.splice(index, 1)
-        selectedElementIds.value.delete(id)
-      }
-    })
-    saveToHistory()
-  }
+  // These functions are now defined later with asset cleanup
 
   function duplicateElement(elementId: string): AnyCanvasElement | null {
     const element = elements.value.find((el) => el.id === elementId)
@@ -284,91 +267,107 @@ export const useCanvasStore = defineStore('canvas', () => {
     contextMenu.options = []
   }
 
-  // Element creation helpers
-  function createTextElement(text: string = 'New Text', x: number = 100, y: number = 100): string {
-    const id = `text_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const element = new TextElement(id, text, x, y)
-    addElement(element)
-    selectElement(id)
-    return id
+  // Asset management integration
+  const assetStore = useAssetStore()
+
+  // Clean up unused assets when elements are removed
+  function removeElement(elementId: string): void {
+    const element = getElementById(elementId)
+    if (!element) return
+
+    // Remove from elements array
+    elements.value = elements.value.filter((el) => el.id !== elementId)
+
+    // Clean up any associated assets
+    cleanupUnusedAssets()
+
+    // Update history and selection
+    saveToHistory()
+    deselectElement(elementId)
   }
 
-  function createImageElement(imageAssetIdOrSrc?: string, x?: number, y?: number): string {
-    const id = `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  // Override the existing removeElements to add asset cleanup
+  function removeElements(elementIds: string[]): void {
+    elements.value = elements.value.filter((el) => !elementIds.includes(el.id))
 
-    let imageData: {
-      src: string
-      alt: string
-      x: number
-      y: number
-      width: number
-      height: number
-    }
+    // Clean up assets for removed elements
+    cleanupUnusedAssets()
 
-    // Check if it's an imageAssetId from the image service
-    if (
-      imageAssetIdOrSrc &&
-      (imageAssetIdOrSrc.startsWith('stock-') ||
-        imageAssetIdOrSrc.startsWith('uploaded-') ||
-        imageAssetIdOrSrc.startsWith('url-'))
-    ) {
-      // It's an image asset ID - use the image service
-      const imageAsset = imageService.getImageAsset(imageAssetIdOrSrc)
+    // Clear selection and save history
+    clearSelection()
+    saveToHistory()
+  }
 
-      if (imageAsset) {
-        imageData = imageService.createImageElementData(imageAsset, x, y)
-        console.log('Creating image element from asset:', imageAsset.title, imageData)
-      } else {
-        // Fallback if asset not found
-        console.warn(`Image asset not found: ${imageAssetIdOrSrc}, using fallback`)
-        imageData = {
-          src: 'https://picsum.photos/200/300',
-          alt: 'Fallback Image',
-          x: x ?? 100,
-          y: y ?? 100,
-          width: 200,
-          height: 200,
+  // Clean up unused assets based on current elements
+  function cleanupUnusedAssets(): void {
+    // Get all image IDs currently in use
+    const activeImageIds: string[] = []
+    const activeFontFamilies: string[] = []
+
+    elements.value.forEach((element) => {
+      // Collect image IDs from ImageElements
+      if (element.type === 'image') {
+        // For image elements, use the element ID as the asset ID
+        activeImageIds.push(element.id)
+      }
+
+      // Collect font families from TextElements and ButtonElements
+      if (element.type === 'text') {
+        const textEl = element as TextElement
+        if (textEl.style?.fontFamily) {
+          activeFontFamilies.push(textEl.style.fontFamily)
+        }
+      } else if (element.type === 'button') {
+        // ButtonElement has style.fontFamily
+        const buttonEl = element as ButtonElement
+        if (buttonEl.style?.fontFamily) {
+          activeFontFamilies.push(buttonEl.style.fontFamily)
         }
       }
-    } else {
-      // It's a direct src URL or no parameter (backward compatibility)
-      const src = imageAssetIdOrSrc || 'https://picsum.photos/200/300'
-      imageData = {
-        src,
-        alt: 'Image',
-        x: x ?? 100,
-        y: y ?? 100,
-        width: 200,
-        height: 200,
-      }
-    }
+    })
 
-    const element = new ImageElement(
-      id,
-      imageData.src,
-      imageData.alt,
-      imageData.x,
-      imageData.y,
-      imageData.width,
-      imageData.height,
-    )
-
-    addElement(element)
-    selectElement(id)
-    console.log('Created image element:', element)
-    return id
+    // Clean up unused assets
+    assetStore.clearUnusedImages(activeImageIds)
+    assetStore.clearUnusedFonts(activeFontFamilies)
   }
 
-  function createButtonElement(
-    text: string = 'Click Me',
-    x: number = 100,
-    y: number = 100,
-  ): string {
-    const id = `button_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const element = new ButtonElement(id, text, x, y)
+  // Generic element creation - truly agnostic!
+  function createElement(element: AnyCanvasElement): string {
     addElement(element)
-    selectElement(id)
-    return id
+    selectElement(element.id)
+    return element.id
+  }
+
+  // Service-driven element creation
+  async function createElementFromService(
+    serviceType: string,
+    assetId: string,
+    position?: { x: number; y: number },
+  ): Promise<string> {
+    const service = assetServiceRegistry.getService(serviceType)
+    if (!service) throw new Error(`Service not found: ${serviceType}`)
+
+    const asset = service.assets.value.find((a) => a.id === assetId)
+    if (!asset) throw new Error(`Asset not found: ${assetId}`)
+
+    const { element } = await service.createCanvasElement(asset, position)
+    return createElement(element)
+  }
+
+  // Convenience method for creating elements from the first asset of a service type
+  async function createDefaultElementFromService(
+    serviceType: string,
+    position?: { x: number; y: number },
+  ): Promise<string> {
+    const service = assetServiceRegistry.getService(serviceType)
+    if (!service) throw new Error(`Service not found: ${serviceType}`)
+
+    const assets = service.assets.value
+    if (assets.length === 0) throw new Error(`No assets available for service: ${serviceType}`)
+
+    const defaultAsset = assets[0]! // Use first available asset as default
+    const { element } = await service.createCanvasElement(defaultAsset, position)
+    return createElement(element)
   }
 
   // Initialize history with empty state
@@ -428,8 +427,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     hideContextMenu,
 
     // Element creation
-    createTextElement,
-    createImageElement,
-    createButtonElement,
+    createElement,
+    createElementFromService,
+    createDefaultElementFromService,
   }
 })

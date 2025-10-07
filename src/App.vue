@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import CanvasEditor from './components/CanvasEditor.vue'
 import Toolbar from './components/Toolbar.vue'
-import OptionsBar from './components/OptionsBar.vue'
+import ControlPanel from './components/ControlPanel.vue'
 import TopNavBar from './components/TopNavBar.vue'
 import AssetsPanel from './components/AssetsPanel.vue'
 import ZoomControls from './components/ZoomControls.vue'
@@ -27,11 +27,11 @@ function handleToolChanged(toolId: string) {
         <AssetsPanel :activePanel="activePanel" />
       </aside>
 
-      <!-- Canvas Area with Top Options -->
+      <!-- Canvas Area -->
       <div class="canvas-area">
-        <!-- Horizontal Options Bar -->
-        <div class="top-options">
-          <OptionsBar />
+        <!-- Minimal Control Panel at Top -->
+        <div class="top-controls">
+          <ControlPanel />
         </div>
 
         <!-- Canvas Container -->
@@ -81,7 +81,7 @@ function handleToolChanged(toolId: string) {
   margin-left: 1px;
 }
 
-.top-options {
+.top-controls {
   flex-shrink: 0;
   background: #ffffff;
   border-bottom: 1px solid #e1e5e9;

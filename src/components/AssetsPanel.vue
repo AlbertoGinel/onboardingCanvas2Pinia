@@ -189,6 +189,56 @@ async function handleImageUpload(event: Event) {
   padding: 16px;
 }
 
+/* Base modular asset grid - configured by services */
+.asset-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* Image-specific styling - MASONRY GRID! 🎨 */
+.asset-grid.image-assets-grid.masonry-grid {
+  /* CSS Grid masonry layout */
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: minmax(60px, auto); /* Minimum row height with auto expansion */
+  grid-auto-flow: row dense; /* Pack items tightly */
+  align-items: start;
+  gap: var(--masonry-gap, 12px);
+
+  /* Better spacing and visual flow */
+  padding: 4px;
+}
+
+/* Masonry item styling with enhanced visuals */
+.asset-grid.masonry-grid .image-asset-preview-container {
+  transition: var(--masonry-transition);
+  border-radius: var(--masonry-border-radius);
+  box-shadow: var(--masonry-shadow);
+  overflow: hidden;
+
+  /* Ensure items fit their content */
+  display: flex;
+  flex-direction: column;
+
+  /* Beautiful subtle border */
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.asset-grid.masonry-grid .image-asset-preview-container:hover {
+  transform: scale(var(--masonry-hover-scale, 1.03)) translateZ(0);
+  box-shadow: var(--masonry-hover-shadow);
+  border-color: #3498db;
+  z-index: 10; /* Bring hovered item to front */
+}
+
+/* Responsive masonry adjustments */
+@media (max-width: 400px) {
+  .asset-grid.image-assets-grid.masonry-grid {
+    grid-template-columns: 1fr; /* Single column on very small screens */
+  }
+}
+
+/* Legacy grids for backward compatibility */
 .template-grid,
 .image-grid,
 .shape-grid {

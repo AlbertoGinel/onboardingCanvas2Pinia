@@ -9,7 +9,7 @@
     >
       <v-layer>
         <!-- Canvas background -->
-        <v-rect 
+        <v-rect
           :config="{
             x: 0,
             y: 0,
@@ -17,15 +17,15 @@
             height: canvasStore.settings.height,
             fill: canvasStore.settings.backgroundColor,
             stroke: '#e9ecef',
-            strokeWidth: 1
+            strokeWidth: 1,
           }"
         />
-        
+
         <!-- Grid (if enabled) -->
         <template v-if="canvasStore.settings.showGrid">
           <!-- Grid lines will be implemented later -->
         </template>
-        
+
         <!-- Render elements -->
         <template v-for="element in canvasStore.sortedElements" :key="element.id">
           <!-- Text elements -->
@@ -45,13 +45,13 @@
               opacity: element.opacity,
               visible: element.visible,
               draggable: !element.locked,
-              listening: !element.locked
+              listening: !element.locked,
             }"
             @click="handleElementClick(element.id, $event)"
             @dblclick="handleTextDoubleClick(element.id)"
             @dragend="handleElementDragEnd(element.id, $event)"
           />
-          
+
           <!-- Image elements -->
           <v-image
             v-else-if="element.type === 'image'"
@@ -73,15 +73,15 @@
               fill: getImageForElement(element as ImageElement) ? undefined : '#f8f9fa',
               stroke: getImageForElement(element as ImageElement) ? undefined : '#dee2e6',
               strokeWidth: getImageForElement(element as ImageElement) ? undefined : 2,
-              dash: getImageForElement(element as ImageElement) ? undefined : [5, 5]
+              dash: getImageForElement(element as ImageElement) ? undefined : [5, 5],
             }"
             @click="handleElementClick(element.id, $event)"
             @dragend="handleElementDragEnd(element.id, $event)"
           />
-          
+
           <!-- Loading indicator for images -->
           <v-text
-            v-if="element.type === 'image' && imageLoadingStates[element.id] === 'loading'"
+            v-if="element.type === 'image' && assetStore.isImageLoading(element.id)"
             :config="{
               x: element.transform.x + element.transform.width / 2,
               y: element.transform.y + element.transform.height / 2,
@@ -90,13 +90,13 @@
               fill: '#6c757d',
               align: 'center',
               offsetX: 35,
-              offsetY: 7
+              offsetY: 7,
             }"
           />
-          
+
           <!-- Error indicator for failed images -->
           <v-text
-            v-if="element.type === 'image' && imageLoadingStates[element.id] === 'error'"
+            v-if="element.type === 'image' && assetStore.hasImageError(element.id)"
             :config="{
               x: element.transform.x + element.transform.width / 2,
               y: element.transform.y + element.transform.height / 2,
@@ -105,10 +105,10 @@
               fill: '#dc3545',
               align: 'center',
               offsetX: 50,
-              offsetY: 7
+              offsetY: 7,
             }"
           />
-          
+
           <!-- Button elements -->
           <v-group
             v-else-if="element.type === 'button'"
@@ -122,7 +122,7 @@
               opacity: element.opacity,
               visible: element.visible,
               draggable: !element.locked,
-              listening: !element.locked
+              listening: !element.locked,
             }"
             @click="handleElementClick(element.id, $event)"
             @dragend="handleElementDragEnd(element.id, $event)"
@@ -135,28 +135,34 @@
                 fill: (element as ButtonElement).style.backgroundColor,
                 stroke: (element as ButtonElement).style.borderColor,
                 strokeWidth: (element as ButtonElement).style.borderWidth,
-                cornerRadius: (element as ButtonElement).style.borderRadius
+                cornerRadius: (element as ButtonElement).style.borderRadius,
               }"
             />
-            
+
             <!-- Button text -->
             <v-text
               :config="{
                 x: (element as ButtonElement).style.padding.left,
                 y: (element as ButtonElement).style.padding.top,
-                width: element.transform.width - (element as ButtonElement).style.padding.left - (element as ButtonElement).style.padding.right,
-                height: element.transform.height - (element as ButtonElement).style.padding.top - (element as ButtonElement).style.padding.bottom,
+                width:
+                  element.transform.width -
+                  (element as ButtonElement).style.padding.left -
+                  (element as ButtonElement).style.padding.right,
+                height:
+                  element.transform.height -
+                  (element as ButtonElement).style.padding.top -
+                  (element as ButtonElement).style.padding.bottom,
                 text: (element as ButtonElement).text,
                 fontSize: (element as ButtonElement).style.fontSize,
                 fontFamily: (element as ButtonElement).style.fontFamily,
                 fill: (element as ButtonElement).style.textColor,
                 align: 'center',
-                verticalAlign: 'middle'
+                verticalAlign: 'middle',
               }"
             />
           </v-group>
         </template>
-        
+
         <!-- Selection transformer -->
         <v-transformer
           v-if="canvasStore.hasSelection && !canvasStore.isTextEditing"
@@ -168,19 +174,19 @@
                 return oldBox
               }
               return newBox
-            }
+            },
           }"
         />
       </v-layer>
     </v-stage>
-    
+
     <!-- Context Menu -->
     <div
       v-if="canvasStore.contextMenu.visible"
       class="context-menu"
       :style="{
         left: canvasStore.contextMenu.x + 'px',
-        top: canvasStore.contextMenu.y + 'px'
+        top: canvasStore.contextMenu.y + 'px',
       }"
       @click.stop
     >
@@ -196,7 +202,7 @@
         <hr v-else class="context-menu-divider" />
       </template>
     </div>
-    
+
     <!-- Text Editing Overlay -->
     <div
       v-if="canvasStore.isTextEditing && canvasStore.editingElementId"
@@ -219,10 +225,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCanvasStore } from '../stores'
+import { useAssetStore } from '../stores/assets'
 import { TextElement, ImageElement, ButtonElement } from '../models'
 import type { AnyCanvasElement } from '../models'
 
 const canvasStore = useCanvasStore()
+const assetStore = useAssetStore()
 
 // Refs
 const containerRef = ref<HTMLDivElement>()
@@ -233,71 +241,62 @@ const textEditRef = ref<HTMLTextAreaElement>()
 // Text editing state
 const editingText = ref('')
 
-// Image loading state
-const loadedImages = ref<Record<string, HTMLImageElement>>({})
-const imageLoadingStates = ref<Record<string, 'loading' | 'loaded' | 'error'>>({})
+// Image loading now handled by Asset Store
 
-// Watch for new image elements and load their images
-watch(() => canvasStore.elements, (newElements) => {
-  newElements.forEach(element => {
-    if (element.type === 'image' && (element as ImageElement).src && !loadedImages.value[element.id]) {
-      loadImage(element as ImageElement)
-    }
-  })
-}, { deep: true, immediate: true })
-
-// Function to load images
-function loadImage(imageElement: ImageElement) {
-  if (imageLoadingStates.value[imageElement.id] === 'loading') return
-  
-  imageLoadingStates.value[imageElement.id] = 'loading'
-  
-  const img = new Image()
-  img.crossOrigin = 'anonymous'
-  
-  img.onload = () => {
-    loadedImages.value[imageElement.id] = img
-    imageLoadingStates.value[imageElement.id] = 'loaded'
-    console.log(`Image loaded for element ${imageElement.id}:`, imageElement.src)
-  }
-  
-  img.onerror = () => {
-    console.warn(`Failed to load image for element ${imageElement.id}:`, imageElement.src)
-    imageLoadingStates.value[imageElement.id] = 'error'
-  }
-  
-  img.src = imageElement.src
-}
+// Watch for new image elements and load their images using Asset Store
+watch(
+  () => canvasStore.elements,
+  (newElements) => {
+    newElements.forEach(async (element) => {
+      if (
+        element.type === 'image' &&
+        (element as ImageElement).src &&
+        !assetStore.getLoadedImage(element.id) &&
+        !assetStore.isImageLoading(element.id)
+      ) {
+        try {
+          // Load image through Asset Store
+          await assetStore.loadImage((element as ImageElement).src, element.id)
+          console.log(`✅ Successfully loaded image for element: ${element.id}`)
+        } catch (error) {
+          console.error(`❌ Failed to load image for element ${element.id}:`, error)
+        }
+      }
+    })
+  },
+  { deep: true, immediate: true },
+)
 
 // Helper function to get loaded image or null
 function getImageForElement(element: ImageElement): HTMLImageElement | null {
-  return loadedImages.value[element.id] || null
+  // Use Asset Store to get loaded image
+  return assetStore.getLoadedImage(element.id)
 }
 
 // Text edit overlay style
 const textEditOverlayStyle = computed(() => {
   if (!canvasStore.editingElementId) return { display: 'none' }
-  
+
   const element = canvasStore.getElementById(canvasStore.editingElementId)
   if (!element || element.type !== 'text') return { display: 'none' }
-  
+
   const stage = stageRef.value?.getNode?.() || stageRef.value
   if (!stage) return { display: 'none' }
-  
+
   const transform = element.transform
   const stageScale = stage.scaleX?.() || 1
   const stagePos = { x: stage.x?.() || 0, y: stage.y?.() || 0 }
-  
+
   return {
     position: 'absolute' as const,
-    left: (transform.x * stageScale + stagePos.x) + 'px',
-    top: (transform.y * stageScale + stagePos.y) + 'px',
-    width: (transform.width * stageScale) + 'px',
-    height: (transform.height * stageScale) + 'px',
-    fontSize: ((element as TextElement).style.fontSize * stageScale) + 'px',
+    left: transform.x * stageScale + stagePos.x + 'px',
+    top: transform.y * stageScale + stagePos.y + 'px',
+    width: transform.width * stageScale + 'px',
+    height: transform.height * stageScale + 'px',
+    fontSize: (element as TextElement).style.fontSize * stageScale + 'px',
     fontFamily: (element as TextElement).style.fontFamily,
     color: (element as TextElement).style.fill,
-    zIndex: 1000
+    zIndex: 1000,
   }
 })
 
@@ -309,7 +308,7 @@ const stageConfig = computed(() => ({
   scaleY: canvasStore.settings.zoom,
   x: canvasStore.settings.panX,
   y: canvasStore.settings.panY,
-  draggable: false
+  draggable: false,
 }))
 
 // For now, we'll implement image loading later to avoid CORS issues
@@ -318,20 +317,20 @@ const stageConfig = computed(() => ({
 // Get selected nodes for transformer
 function getSelectedNodes() {
   if (!stageRef.value) return []
-  
+
   try {
     const stage = stageRef.value.getNode?.() || stageRef.value
     if (!stage || typeof stage.findOne !== 'function') return []
-    
+
     const selectedNodes = []
-    
+
     for (const elementId of canvasStore.selectedElementIds) {
       const node = stage.findOne(`#${elementId}`)
       if (node) {
         selectedNodes.push(node)
       }
     }
-    
+
     return selectedNodes
   } catch (error) {
     console.warn('Error getting selected nodes:', error)
@@ -351,10 +350,10 @@ function handleStageClick(e: any) {
 
 function handleStageRightClick(e: any) {
   e.evt.preventDefault()
-  
+
   const stage = e.target.getStage?.() || e.target
   const pointer = stage.getPointerPosition?.() || { x: e.evt.clientX, y: e.evt.clientY }
-  
+
   const clickedOnEmpty = e.target === stage || e.target.className === 'Stage'
   if (clickedOnEmpty) {
     // Right-clicked on empty canvas
@@ -364,11 +363,11 @@ function handleStageRightClick(e: any) {
 
 function handleElementClick(elementId: string, e: any) {
   e.cancelBubble = true
-  
+
   const isMultiSelect = e.evt.ctrlKey || e.evt.metaKey
   canvasStore.selectElement(elementId, isMultiSelect)
   canvasStore.hideContextMenu()
-  
+
   // Update transformer after selection
   nextTick(() => {
     updateTransformer()
@@ -381,7 +380,7 @@ function handleTextDoubleClick(elementId: string) {
     const textElement = element as TextElement
     editingText.value = textElement.text
     canvasStore.startTextEditing(elementId)
-    
+
     nextTick(() => {
       if (textEditRef.value) {
         textEditRef.value.focus()
@@ -397,82 +396,85 @@ function handleElementDragEnd(elementId: string, e: any) {
     transform: {
       ...canvasStore.getElementById(elementId)?.transform!,
       x: node.x(),
-      y: node.y()
-    }
+      y: node.y(),
+    },
   } as Partial<AnyCanvasElement>)
 }
 
 function handleWheel(e: any) {
   e.evt.preventDefault()
-  
+
   const stage = e.target.getStage?.() || e.target
   const pointer = stage.getPointerPosition?.() || { x: 0, y: 0 }
-  
+
   const scaleBy = 1.1
   const oldScale = stage.scaleX?.() || 1
-  
+
   let newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
-  
+
   // Limit zoom
   newScale = Math.max(0.1, Math.min(5, newScale))
-  
+
   // Calculate new position to zoom towards cursor
   const mousePointTo = {
     x: (pointer.x - stage.x()) / oldScale,
-    y: (pointer.y - stage.y()) / oldScale
+    y: (pointer.y - stage.y()) / oldScale,
   }
-  
+
   const newPos = {
     x: pointer.x - mousePointTo.x * newScale,
-    y: pointer.y - mousePointTo.y * newScale
+    y: pointer.y - mousePointTo.y * newScale,
   }
-  
+
   canvasStore.settings.zoom = newScale
   canvasStore.settings.panX = newPos.x
   canvasStore.settings.panY = newPos.y
 }
 
 // Context menu actions
-function handleContextMenuAction(action: string) {
+async function handleContextMenuAction(action: string) {
   canvasStore.hideContextMenu()
-  
-  switch (action) {
-    case 'add-text':
-      canvasStore.createTextElement()
-      break
-    case 'add-image':
-      // This will be implemented later with file upload
-      canvasStore.createImageElement('https://via.placeholder.com/200x200?text=Image')
-      break
-    case 'add-button':
-      canvasStore.createButtonElement()
-      break
-    case 'paste':
-      // Paste functionality will be implemented later
-      break
-    case 'select-all':
-      canvasStore.selectAll()
-      break
-    case 'duplicate':
-      if (canvasStore.contextMenu.elementId) {
-        canvasStore.duplicateElement(canvasStore.contextMenu.elementId)
-      }
-      break
-    case 'delete':
-      if (canvasStore.contextMenu.elementId) {
-        canvasStore.removeElement(canvasStore.contextMenu.elementId)
-      }
-      break
-    case 'bring-to-front':
-      if (canvasStore.contextMenu.elementId) {
-        canvasStore.bringToFront(canvasStore.contextMenu.elementId)
-      }
-      break
-    case 'send-to-back':
-      if (canvasStore.contextMenu.elementId) {
-        canvasStore.sendToBack(canvasStore.contextMenu.elementId)
-      }
-      break
+
+  try {
+    switch (action) {
+      case 'add-text':
+        await canvasStore.createDefaultElementFromService('text')
+        break
+      case 'add-image':
+        await canvasStore.createDefaultElementFromService('images')
+        break
+      case 'add-button':
+        await canvasStore.createDefaultElementFromService('buttons')
+        break
+      case 'paste':
+        // Paste functionality will be implemented later
+        break
+      case 'select-all':
+        canvasStore.selectAll()
+        break
+      case 'duplicate':
+        if (canvasStore.contextMenu.elementId) {
+          canvasStore.duplicateElement(canvasStore.contextMenu.elementId)
+        }
+        break
+      case 'delete':
+        if (canvasStore.contextMenu.elementId) {
+          canvasStore.removeElement(canvasStore.contextMenu.elementId)
+        }
+        break
+      case 'bring-to-front':
+        if (canvasStore.contextMenu.elementId) {
+          canvasStore.bringToFront(canvasStore.contextMenu.elementId)
+        }
+        break
+      case 'send-to-back':
+        if (canvasStore.contextMenu.elementId) {
+          canvasStore.sendToBack(canvasStore.contextMenu.elementId)
+        }
+        break
+    }
+  } catch (error) {
+    console.error('Failed to create element:', error)
   }
 }
 
@@ -490,7 +492,7 @@ function handleTextEditBlur() {
 function handleTextEditKeydown(e: KeyboardEvent) {
   // Stop propagation to prevent global keyboard shortcuts
   e.stopPropagation()
-  
+
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     handleTextEditBlur()
@@ -512,23 +514,23 @@ onMounted(() => {
       if (stage?.size) {
         stage.size({
           width: containerRef.value.clientWidth,
-          height: containerRef.value.clientHeight
+          height: containerRef.value.clientHeight,
         })
       }
     }
   }
-  
+
   window.addEventListener('resize', handleResize)
-  
+
   // Handle clicks outside context menu
   const handleClickOutside = (e: MouseEvent) => {
     if (canvasStore.contextMenu.visible) {
       canvasStore.hideContextMenu()
     }
   }
-  
+
   document.addEventListener('click', handleClickOutside)
-  
+
   onUnmounted(() => {
     window.removeEventListener('resize', handleResize)
     document.removeEventListener('click', handleClickOutside)
@@ -536,17 +538,21 @@ onMounted(() => {
 })
 
 // Watch for transformer updates
-watch(() => canvasStore.selectedElementIds, () => {
-  nextTick(() => {
-    updateTransformer()
-  })
-}, { deep: true })
+watch(
+  () => canvasStore.selectedElementIds,
+  () => {
+    nextTick(() => {
+      updateTransformer()
+    })
+  },
+  { deep: true },
+)
 
 function updateTransformer() {
   if (!transformerRef.value || !canvasStore.hasSelection || canvasStore.isTextEditing) {
     return
   }
-  
+
   try {
     const transformer = transformerRef.value.getNode?.() || transformerRef.value
     if (transformer && typeof transformer.nodes === 'function') {

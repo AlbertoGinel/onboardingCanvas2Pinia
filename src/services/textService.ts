@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { TextElement } from '../models'
 import type { IAssetService, AssetTemplate, CanvasElementData } from './asset-service-interface'
+import type { ControlFunction } from '../controls/controlFunctions'
 
 /**
  * Service for managing text asset templates and creating text elements
@@ -28,6 +29,106 @@ export class TextService implements IAssetService {
 
   getDisplayName(): string {
     return 'Text'
+  }
+
+  // Define what controls this tool uses
+  getControlList(): string[] {
+    return [
+      'positionX',
+      'positionY',
+      'rotation',
+      'fontSize',
+      'fontFamily',
+      'fontWeight',
+      'fontStyle',
+      'fill',
+      'align',
+      'lineHeight',
+      'letterSpacing',
+      'textDecoration',
+      'opacity',
+    ]
+  }
+
+  // Define tool-specific control configurations
+  getControlConfigurations(): Record<string, Partial<ControlFunction>> {
+    return {
+      fontSize: {
+        type: 'slider',
+        label: 'Font Size',
+        icon: '🔤',
+        getConfig: () => ({ min: 8, max: 200, step: 1 }),
+        getValue: (element) => {
+          const textEl = element as TextElement
+          return textEl.style.fontSize
+        },
+        setValue: (element, value) => {
+          const textEl = element as TextElement
+          textEl.setFontSize(value as number)
+        },
+      },
+      fontFamily: {
+        type: 'select',
+        label: 'Font Family',
+        icon: '✍️',
+        getOptions: () => this.getAvailableFonts(),
+        getValue: (element) => {
+          const textEl = element as TextElement
+          return textEl.style.fontFamily
+        },
+        setValue: (element, value) => {
+          const textEl = element as TextElement
+          textEl.setFontFamily(value as string)
+        },
+      },
+      fill: {
+        type: 'color',
+        label: 'Text Color',
+        icon: '🎨',
+        getValue: (element) => {
+          const textEl = element as TextElement
+          return textEl.style.fill
+        },
+        setValue: (element, value) => {
+          const textEl = element as TextElement
+          textEl.setFill(value as string)
+        },
+      },
+      fontWeight: {
+        type: 'select',
+        label: 'Font Weight',
+        icon: '💪',
+        getOptions: () => [
+          { value: 'normal', label: 'Normal' },
+          { value: 'bold', label: 'Bold' },
+          { value: '300', label: 'Light' },
+          { value: '600', label: 'Semi Bold' },
+          { value: '900', label: 'Black' },
+        ],
+        getValue: (element) => {
+          const textEl = element as TextElement
+          return textEl.style.fontWeight
+        },
+        setValue: (element, value) => {
+          const textEl = element as TextElement
+          textEl.setFontWeight(value as TextElement['style']['fontWeight'])
+        },
+      },
+    }
+  }
+
+  // Get available fonts for the font family control
+  private getAvailableFonts() {
+    return [
+      { value: 'Arial', label: 'Arial' },
+      { value: 'Georgia', label: 'Georgia' },
+      { value: 'Times New Roman', label: 'Times New Roman' },
+      { value: 'Courier New', label: 'Courier New' },
+      { value: 'Helvetica', label: 'Helvetica' },
+      { value: 'Verdana', label: 'Verdana' },
+      { value: 'Comic Sans MS', label: 'Comic Sans MS' },
+      { value: 'Impact', label: 'Impact' },
+    ]
   }
 
   private initializeTextTemplates(): void {

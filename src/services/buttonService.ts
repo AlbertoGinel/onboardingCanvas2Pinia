@@ -7,6 +7,7 @@ import type {
   CanvasElementData,
   AssetRenderConfig,
 } from './asset-service-interface'
+import type { ControlFunction } from '../controls/controlFunctions'
 
 /**
  * Service for managing button asset templates and creating button elements
@@ -276,6 +277,102 @@ export class ButtonService implements IAssetService {
 
   getDisplayName(): string {
     return 'Buttons'
+  }
+
+  // Define what controls this tool uses
+  getControlList(): string[] {
+    return [
+      'positionX',
+      'positionY',
+      'width',
+      'height',
+      'rotation',
+      'text',
+      'fontSize',
+      'fontFamily',
+      'textColor',
+      'backgroundColor',
+      'borderColor',
+      'borderWidth',
+      'borderRadius',
+      'padding',
+      'url',
+      'opacity',
+    ]
+  }
+
+  // Define tool-specific control configurations
+  getControlConfigurations(): Record<string, Partial<ControlFunction>> {
+    return {
+      text: {
+        type: 'input',
+        label: 'Button Text',
+        icon: '📝',
+        getConfig: () => ({ maxLength: 50 }),
+        getValue: (element) => {
+          const buttonEl = element as ButtonElement
+          return buttonEl.text
+        },
+        setValue: (element, value) => {
+          const buttonEl = element as ButtonElement
+          buttonEl.setText(value as string)
+        },
+      },
+      backgroundColor: {
+        type: 'color',
+        label: 'Background Color',
+        icon: '🎨',
+        getValue: (element) => {
+          const buttonEl = element as ButtonElement
+          return buttonEl.style.backgroundColor
+        },
+        setValue: (element, value) => {
+          const buttonEl = element as ButtonElement
+          buttonEl.setBackgroundColor(value as string)
+        },
+      },
+      textColor: {
+        type: 'color',
+        label: 'Text Color',
+        icon: '✏️',
+        getValue: (element) => {
+          const buttonEl = element as ButtonElement
+          return buttonEl.style.textColor
+        },
+        setValue: (element, value) => {
+          const buttonEl = element as ButtonElement
+          buttonEl.setTextColor(value as string)
+        },
+      },
+      borderRadius: {
+        type: 'slider',
+        label: 'Border Radius',
+        icon: '⭕',
+        getConfig: () => ({ min: 0, max: 50, step: 1 }),
+        getValue: (element) => {
+          const buttonEl = element as ButtonElement
+          return buttonEl.style.borderRadius
+        },
+        setValue: (element, value) => {
+          const buttonEl = element as ButtonElement
+          buttonEl.setBorderRadius(value as number)
+        },
+      },
+      url: {
+        type: 'input',
+        label: 'Link URL',
+        icon: '🔗',
+        getConfig: () => ({ placeholder: 'https://example.com' }),
+        getValue: (element) => {
+          const buttonEl = element as ButtonElement
+          return buttonEl.url || ''
+        },
+        setValue: (element, value) => {
+          const buttonEl = element as ButtonElement
+          buttonEl.setUrl(value as string)
+        },
+      },
+    }
   }
 }
 

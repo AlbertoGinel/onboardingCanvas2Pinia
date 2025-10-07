@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { AnyCanvasElement } from '../models'
+import type { ControlFunction } from '../controls/controlFunctions'
 
 export interface AssetTemplate {
   id: string
@@ -75,4 +76,15 @@ export interface IAssetService {
    * This is used for panel titles and labels
    */
   getDisplayName(): string
+
+  /**
+   * Optional: Get list of control IDs that this asset type uses
+   */
+  getControlList?(): string[]
+
+  /**
+   * Optional: Get control configurations specific to this asset type
+   * This allows services to override default control behavior
+   */
+  getControlConfigurations?(): Record<string, Partial<ControlFunction>>
 }

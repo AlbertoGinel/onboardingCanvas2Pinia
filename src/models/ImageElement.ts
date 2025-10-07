@@ -195,6 +195,11 @@ export class ImageElement extends CanvasElement {
       // Image-specific controls
       'imageSrc',
       'imageAlt',
+      'brightness',
+      'contrast',
+      'saturation',
+      'hue',
+      'blur',
     ]
   }
 

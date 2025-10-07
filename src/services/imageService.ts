@@ -7,6 +7,8 @@ import type {
   CanvasElementData,
   AssetRenderConfig,
 } from './asset-service-interface'
+import type { ControlFunction } from '../controls/controlFunctions'
+import { useAssetStore } from '../stores/assets'
 
 export interface ImageAsset {
   id: string
@@ -21,8 +23,7 @@ export interface ImageAsset {
 
 class ImageService implements IAssetService {
   private imagePool = ref<ImageAsset[]>([])
-  private loadingImages = ref<Set<string>>(new Set())
-  private loadedImages = ref<Map<string, HTMLImageElement>>(new Map())
+  // Asset loading now handled by Asset Store - no more private loading state!
 
   constructor() {
     this.initializeStockImages()
@@ -33,42 +34,43 @@ class ImageService implements IAssetService {
     const stockImages: ImageAsset[] = [
       {
         id: 'stock-1',
-        src: 'https://picsum.photos/id/1/400/300',
+        src: 'https://picsum.photos/id/1/400/300', // Respect original aspect ratio
         title: 'Mountain Landscape',
         category: 'stock',
         tags: ['nature', 'landscape'],
+        // Let preloadImage() determine actual dimensions from loaded image
       },
       {
         id: 'stock-2',
-        src: 'https://picsum.photos/id/10/400/300',
+        src: 'https://picsum.photos/id/10/300/400', // Different size for variety
         title: 'Forest Path',
         category: 'stock',
         tags: ['nature', 'forest'],
       },
       {
         id: 'stock-3',
-        src: 'https://picsum.photos/id/20/400/300',
+        src: 'https://picsum.photos/id/20/350/350', // Square format
         title: 'Ocean View',
         category: 'stock',
         tags: ['nature', 'ocean'],
       },
       {
         id: 'stock-4',
-        src: 'https://picsum.photos/id/30/400/300',
+        src: 'https://picsum.photos/id/30/400/250', // Wide landscape
         title: 'City Architecture',
         category: 'stock',
         tags: ['urban', 'architecture'],
       },
       {
         id: 'stock-5',
-        src: 'https://picsum.photos/id/40/400/300',
+        src: 'https://picsum.photos/id/40/280/400', // Tall format
         title: 'Abstract Pattern',
         category: 'stock',
         tags: ['abstract', 'design'],
       },
       {
         id: 'stock-6',
-        src: 'https://picsum.photos/id/50/400/300',
+        src: 'https://picsum.photos/id/50/450/300', // Wide landscape
         title: 'Minimalist Design',
         category: 'stock',
         tags: ['minimal', 'design'],
@@ -106,11 +108,6 @@ class ImageService implements IAssetService {
     )
   }
 
-  // Get all images in the pool (reactive) - legacy method for backward compatibility
-  get images() {
-    return computed(() => this.imagePool.value)
-  }
-
   // Get images by category
   getImagesByCategory(category: 'stock' | 'uploaded' | 'recent') {
     return this.imagePool.value.filter((img) => img.category === category)
@@ -121,22 +118,117 @@ class ImageService implements IAssetService {
     return this.imagePool.value.find((img) => img.id === imageId) || null
   }
 
-  // Get rendering configuration for image assets
+  // Get rendering configuration for image assets - MASONRY STYLE! 🎨
   getRenderConfig(): AssetRenderConfig {
     return {
-      gridColumns: 3, // 3-column grid for larger image previews
-      itemHeight: '120px',
+      gridColumns: 2, // Still 2 columns but dynamic heights
+      itemHeight: 'auto', // Let content determine height
       previewComponent: 'ImageAssetPreview',
-      cssClasses: ['image-assets-grid'],
+      cssClasses: ['image-assets-grid', 'masonry-grid'],
       customStyles: {
-        '--image-preview-size': '100px',
-        '--image-preview-radius': '8px',
+        '--masonry-gap': '12px',
+        '--masonry-border-radius': '12px',
+        '--masonry-transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        '--masonry-hover-scale': '1.03',
+        '--masonry-shadow': '0 4px 12px rgba(0, 0, 0, 0.15)',
+        '--masonry-hover-shadow': '0 8px 25px rgba(0, 0, 0, 0.2)',
       },
     }
   }
 
   getDisplayName(): string {
     return 'Images'
+  }
+
+  // Define what controls this tool uses - minimal clean controls
+  getControlList(): string[] {
+    return ['brightness', 'contrast', 'saturation', 'blur', 'opacity']
+  }
+
+  // Define tool-specific control configurations
+  getControlConfigurations(): Record<string, Partial<ControlFunction>> {
+    return {
+      brightness: {
+        type: 'slider',
+        component: 'SliderControl',
+        label: 'Brightness',
+        icon: '☀️',
+        hasMenu: true,
+        getConfig: () => ({ min: 0, max: 2, step: 0.1 }),
+        getValue: (element) => {
+          const imageEl = element as ImageElement
+          return imageEl.filters?.brightness || 1
+        },
+        setValue: (element, value) => {
+          const imageEl = element as ImageElement
+          imageEl.setBrightness(value as number)
+        },
+      },
+      contrast: {
+        type: 'slider',
+        component: 'SliderControl',
+        label: 'Contrast',
+        icon: '🔆',
+        hasMenu: true,
+        getConfig: () => ({ min: 0, max: 2, step: 0.1 }),
+        getValue: (element) => {
+          const imageEl = element as ImageElement
+          return imageEl.filters?.contrast || 1
+        },
+        setValue: (element, value) => {
+          const imageEl = element as ImageElement
+          imageEl.setContrast(value as number)
+        },
+      },
+      saturation: {
+        type: 'slider',
+        component: 'SliderControl',
+        label: 'Saturation',
+        icon: '🎨',
+        hasMenu: true,
+        getConfig: () => ({ min: 0, max: 2, step: 0.1 }),
+        getValue: (element) => {
+          const imageEl = element as ImageElement
+          return imageEl.filters?.saturation || 1
+        },
+        setValue: (element, value) => {
+          const imageEl = element as ImageElement
+          imageEl.setSaturation(value as number)
+        },
+      },
+      blur: {
+        type: 'slider',
+        component: 'SliderControl',
+        label: 'Blur',
+        icon: '🌊',
+        hasMenu: true,
+        getConfig: () => ({ min: 0, max: 10, step: 0.5 }),
+        getValue: (element) => {
+          const imageEl = element as ImageElement
+          return imageEl.filters?.blur || 0
+        },
+        setValue: (element, value) => {
+          const imageEl = element as ImageElement
+          imageEl.setBlur(value as number)
+        },
+      },
+      opacity: {
+        type: 'slider',
+        component: 'SliderControl',
+        label: 'Opacity',
+        icon: '👻',
+        hasMenu: true,
+        getConfig: () => ({ min: 0, max: 1, step: 0.1 }),
+        getValue: (element) => {
+          const imageEl = element as ImageElement
+          return imageEl.opacity || 1
+        },
+        setValue: (element, value) => {
+          const imageEl = element as ImageElement
+          imageEl.opacity = value as number
+        },
+      },
+    }
   }
 
   // Add uploaded image to pool
@@ -187,44 +279,32 @@ class ImageService implements IAssetService {
 
   // Preload single image
   private async preloadImage(imageAsset: ImageAsset): Promise<HTMLImageElement> {
-    if (this.loadedImages.value.has(imageAsset.id)) {
-      return this.loadedImages.value.get(imageAsset.id)!
+    const assetStore = useAssetStore()
+
+    try {
+      const img = await assetStore.loadImage(imageAsset.src, imageAsset.id)
+
+      // Update dimensions from loaded image
+      imageAsset.width = img.naturalWidth
+      imageAsset.height = img.naturalHeight
+
+      return img
+    } catch (error) {
+      console.error(`Failed to preload image: ${imageAsset.src}`, error)
+      throw error
     }
-
-    this.loadingImages.value.add(imageAsset.id)
-
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-
-      img.onload = () => {
-        // Update dimensions
-        imageAsset.width = img.naturalWidth
-        imageAsset.height = img.naturalHeight
-
-        this.loadedImages.value.set(imageAsset.id, img)
-        this.loadingImages.value.delete(imageAsset.id)
-        resolve(img)
-      }
-
-      img.onerror = () => {
-        this.loadingImages.value.delete(imageAsset.id)
-        console.error(`Failed to load image: ${imageAsset.src}`)
-        reject(new Error(`Failed to load image: ${imageAsset.src}`))
-      }
-
-      img.src = imageAsset.src
-    })
   }
 
   // Get loaded HTML image element
   getLoadedImage(imageId: string): HTMLImageElement | null {
-    return this.loadedImages.value.get(imageId) || null
+    const assetStore = useAssetStore()
+    return assetStore.getLoadedImage(imageId)
   }
 
   // Check if image is loading
   isImageLoading(imageId: string): boolean {
-    return this.loadingImages.value.has(imageId)
+    const assetStore = useAssetStore()
+    return assetStore.isImageLoading(imageId)
   }
 
   // Calculate center position for canvas
@@ -252,31 +332,75 @@ class ImageService implements IAssetService {
       height?: number
     }
 
-    // Calculate dimensions
-    let width = 200
-    let height = 200
+    const elementId = `image-${Date.now()}`
 
-    if (imageData.width && imageData.height) {
-      const aspectRatio = imageData.width / imageData.height
-      if (aspectRatio > 1) {
-        // Landscape
-        width = 200
-        height = 200 / aspectRatio
-      } else {
-        // Portrait or square
-        width = 200 * aspectRatio
-        height = 200
-      }
+    // Preload the image FIRST to get actual dimensions
+    const tempAsset = {
+      id: elementId,
+      src: imageData.src,
+      title: imageData.title,
+      width: imageData.width,
+      height: imageData.height,
+      category: 'uploaded' as const,
+      thumbnail: imageData.src,
+      tags: [],
     }
 
+    // Load image and get actual dimensions
+    const loadedImg = await this.preloadImage(tempAsset)
+
+    // Now calculate canvas size based on ACTUAL image dimensions
+    const actualWidth = loadedImg.naturalWidth
+    const actualHeight = loadedImg.naturalHeight
+    const aspectRatio = actualWidth / actualHeight
+
+    // Smart scaling based on aspect ratio to optimize canvas real estate
+    let canvasWidth: number
+    let canvasHeight: number
+
+    if (aspectRatio > 1.5) {
+      // Very wide landscape: use wider max width
+      canvasWidth = 320
+      canvasHeight = 320 / aspectRatio
+    } else if (aspectRatio > 1) {
+      // Standard landscape: balanced scaling
+      canvasWidth = 280
+      canvasHeight = 280 / aspectRatio
+    } else if (aspectRatio > 0.6) {
+      // Portrait: use taller max height
+      canvasHeight = 280
+      canvasWidth = 280 * aspectRatio
+    } else {
+      // Very tall portrait: use even taller max height
+      canvasHeight = 320
+      canvasWidth = 320 * aspectRatio
+    }
+
+    // Ensure minimum size for usability (smaller minimum for very wide/tall images)
+    const minSize = aspectRatio > 2 || aspectRatio < 0.5 ? 100 : 140
+    if (canvasWidth < minSize || canvasHeight < minSize) {
+      const scale = minSize / Math.min(canvasWidth, canvasHeight)
+      canvasWidth *= scale
+      canvasHeight *= scale
+    }
+
+    const finalWidth = Math.round(canvasWidth)
+    const finalHeight = Math.round(canvasHeight)
+
+    console.log(`📐 Canvas Image: ${imageData.title}`)
+    console.log(`   Original: ${actualWidth}x${actualHeight} (ratio: ${aspectRatio.toFixed(2)})`)
+    console.log(
+      `   Canvas: ${finalWidth}x${finalHeight} (ratio: ${(finalWidth / finalHeight).toFixed(2)})`,
+    )
+
     const imageElement = new ImageElement(
-      `image-${Date.now()}`,
+      elementId,
       imageData.src,
       imageData.title,
       position.x,
       position.y,
-      width,
-      height,
+      finalWidth,
+      finalHeight,
     )
 
     return {
@@ -285,57 +409,12 @@ class ImageService implements IAssetService {
     }
   }
 
-  // Create ImageElement data for canvas (to be used by canvas store) - legacy method
-  createImageElementData(
-    imageAsset: ImageAsset,
-    x?: number,
-    y?: number,
-  ): {
-    src: string
-    alt: string
-    x: number
-    y: number
-    width: number
-    height: number
-  } {
-    // Use natural dimensions or fallback
-    let width = 200
-    let height = 200
-
-    if (imageAsset.width && imageAsset.height) {
-      const aspectRatio = imageAsset.width / imageAsset.height
-      if (aspectRatio > 1) {
-        // Landscape
-        width = 200
-        height = 200 / aspectRatio
-      } else {
-        // Portrait or square
-        width = 200 * aspectRatio
-        height = 200
-      }
-    }
-
-    // Calculate center position if not provided
-    const centerPos = this.calculateCenterPosition(800, 600, width, height)
-    const finalX = x ?? centerPos.x
-    const finalY = y ?? centerPos.y
-
-    return {
-      src: imageAsset.src,
-      alt: imageAsset.title,
-      x: finalX,
-      y: finalY,
-      width,
-      height,
-    }
-  }
-
   // Remove image from pool
   removeImage(imageId: string) {
     const index = this.imagePool.value.findIndex((img) => img.id === imageId)
     if (index > -1) {
       this.imagePool.value.splice(index, 1)
-      this.loadedImages.value.delete(imageId)
+      // Asset cleanup is now handled by the Asset Store
     }
   }
 
